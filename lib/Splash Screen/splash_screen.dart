@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -9,71 +10,45 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
-  Timer? _timer;
-
   @override
   void initState() {
     super.initState();
-    _timer = Timer(const Duration(seconds: 3), () {
-      if (mounted) {
-        Navigator.pushReplacementNamed(context, '/home');
-      }
-    });
+    _checkNavigation();
   }
 
-  @override
-  void dispose() {
-    _timer?.cancel(); // جلوگیری از خطای مموری و کروم
-    super.dispose();
+  Future<void> _checkNavigation() async {
+    // ۳ ثانیه توقف برای نمایش اسپلش
+    await Future.delayed(const Duration(seconds: 3));
+
+    final prefs = await SharedPreferences.getInstance();
+    // چک کردن اینکه آیا برای بار اول است یا خیر
+    final bool isFirstTime = prefs.getBool('isFirstTime') ?? true;
+
+    if (mounted) {
+      if (isFirstTime) {
+        // اگر بار اول است -> برو به آنبوردینگ
+        Navigator.pushReplacementNamed(context, '/onboarding');
+      } else {
+        // اگر قبلاً دیده -> مستقیم برو به خانه
+        Navigator.pushReplacementNamed(context, '/home');
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        width: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF1e3c72), Color(0xFF2a5298)],
-            begin: Alignment.topRight,
-            end: Alignment.bottomLeft,
-          ),
-        ),
+    return const Scaffold(
+      backgroundColor: Color(0xFF1e3c72),
+      body: Center(
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Spacer(flex: 3),
-            // بخش محتوای وسط
-            const Text(
-              "سلام، خوش اومدی!",
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 30,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 15),
-            const Text(
-              "دنیای مد و استایل در دستان تو",
-              style: TextStyle(color: Colors.white70, fontSize: 16),
-            ),
-            const Spacer(flex: 2),
-            // انیمیشن بارگذاری
-            const CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-              strokeWidth: 2,
-            ),
-            const SizedBox(height: 60),
+            Text("فروشگاه من", style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold)),
+            SizedBox(height: 20),
+            CircularProgressIndicator(color: Colors.white),
           ],
         ),
       ),
     );
-  }
-}
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Placeholder();
   }
 }
