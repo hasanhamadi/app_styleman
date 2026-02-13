@@ -27,7 +27,7 @@ class CustomBottomNavBar extends StatelessWidget {
                   label: Text('۰'),
                   child: Icon(Icons.shopping_cart_outlined),
                 ),
-                activeIcon: Icon(Icons.card_travel_outlined),
+                activeIcon: Icon(Icons.shopping_cart),
                 label: 'سبد خرید'
             ),
 

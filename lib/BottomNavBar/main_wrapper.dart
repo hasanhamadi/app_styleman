@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../Card/card_screen.dart';
+import '../Card/cart_screen.dart';
 import '../products/product_list_screen.dart';
 import '../search_bar/search_screen.dart';
 import '../uesr/auth_bloc.dart';
@@ -19,7 +19,7 @@ class MainWrapper extends StatelessWidget {
     final List<Widget> _pages = [
       const ProductListScreen(),
       const SearchScreen(), // حالا این صفحه به RepositoryProvider در main دسترسی دارد
-      const CardScreen(),
+      const CartScreen(),
       // مدیریت هوشمند وضعیت پروفایل
       BlocBuilder<AuthBloc, AuthState>(
         builder: (context, state) {
