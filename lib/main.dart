@@ -8,14 +8,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-
-
 // ایمپورت صفحات
 import 'BottomNavBar/main_wrapper.dart';
 import 'BottomNavBar/navigation_cubit.dart';
 import 'Splash Screen/onboarding_screen.dart';
 import 'Splash Screen/splash_screen.dart';
-import 'products/product_list_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -26,43 +23,47 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // ایجاد نمونه‌های مورد نیاز
+    // ۱. ایجاد نمونه‌های ریپازیتوری
     final apiService = ApiService();
     final productRepository = ProductRepository(apiService);
-    final authRepository = AuthRepository(); // اضافه شدن ریپازیتوری احراز هویت
+    final authRepository = AuthRepository();
 
-    return MultiBlocProvider(
+    return MultiRepositoryProvider(
+      // ۲. تزریق ریپازیتوری‌ها (برای حل خطای ProviderNotFound در صفحه جستجو)
       providers: [
-        // ۱. بلاک محصولات (بدون تغییر)
-        BlocProvider<ProductBloc>(
-          create: (context) => ProductBloc(productRepository)..add(LoadProductsEvent()),
-        ),
-        // ۲. کیوبیت ناوبری (بدون تغییر)
-        BlocProvider<NavigationCubit>(
-          create: (context) => NavigationCubit(),
-        ),
-        // ۳. اضافه شدن بلاک احراز هویت (هماهنگ شده)
-        BlocProvider<AuthBloc>(
-          create: (context) => AuthBloc(authRepository),
-        ),
+        RepositoryProvider<ProductRepository>.value(value: productRepository),
+        RepositoryProvider<AuthRepository>.value(value: authRepository),
       ],
-      child: MaterialApp(
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData(fontFamily: 'Vazir', useMaterial3: true),
-        localizationsDelegates: const [
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
+      child: MultiBlocProvider(
+        providers: [
+          BlocProvider<ProductBloc>(
+            create: (context) => ProductBloc(productRepository)..add(LoadProductsEvent()),
+          ),
+          BlocProvider<NavigationCubit>(
+            create: (context) => NavigationCubit(),
+          ),
+          BlocProvider<AuthBloc>(
+            create: (context) => AuthBloc(authRepository),
+          ),
         ],
-        supportedLocales: const [Locale('fa', 'IR')],
-        locale: const Locale('fa', 'IR'),
-        initialRoute: '/',
-        routes: {
-          '/': (context) => const SplashScreen(),
-          '/onboarding': (context) => const OnboardingScreen(),
-          '/auth': (context) => AuthPage(), // روت جدید برای صفحه ورود
-          '/home': (context) => const MainWrapper(),
-        },
+        child: MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: ThemeData(fontFamily: 'Vazir', useMaterial3: true),
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: const [Locale('fa', 'IR')],
+          locale: const Locale('fa', 'IR'),
+          initialRoute: '/',
+          routes: {
+            '/': (context) => const SplashScreen(),
+            '/onboarding': (context) => const OnboardingScreen(),
+            '/auth': (context) => AuthPage(),
+            '/home': (context) => const MainWrapper(),
+          },
+        ),
       ),
     );
   }

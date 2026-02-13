@@ -1,10 +1,8 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-
-
 import '../products/product_list_screen.dart';
+import '../search_bar/search_screen.dart';
 import '../uesr/auth_bloc.dart';
 import '../uesr/auth_page.dart';
 import '../uesr/profile_page.dart';
@@ -16,31 +14,35 @@ class MainWrapper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // ایجاد لیست صفحات به صورت داینامیک برای چک کردن وضعیت لاگین
-    final List<Widget> pages = [
-      const ProductListScreen(), // صفحه اول
-      const Center(child: Text('صفحه جستجو')), // صفحه دوم
+    // تعریف صفحات به صورت جداگانه برای خوانایی بیشتر
+    final List<Widget> _pages = [
+      const ProductListScreen(),
+      const SearchScreen(), // حالا این صفحه به RepositoryProvider در main دسترسی دارد
 
-      // صفحه سوم: مدیریت هوشمند بین پروفایل و صفحه ورود
+      // مدیریت هوشمند وضعیت پروفایل
       BlocBuilder<AuthBloc, AuthState>(
         builder: (context, state) {
           if (state is AuthAuthenticated) {
             return ProfilePage(user: state.user);
-          } else {
-            return AuthPage();
           }
+          // اگر کاربر لاگین نکرده باشد، صفحه ورود نمایش داده می‌شود
+          return const AuthPage();
         },
       ),
     ];
 
     return Scaffold(
-      body: BlocBuilder<NavigationCubit, NavigationState>(
-        builder: (context, state) {
-          return IndexedStack(
-            index: state.currentIndex,
-            children: pages,
-          );
-        },
+      // استفاده از SafeArea برای جلوگیری از تداخل با لبه‌های گوشی
+      body: SafeArea(
+        top: false, // اجازه می‌دهیم محتوا زیر Status Bar برود اگر لازم بود
+        child: BlocBuilder<NavigationCubit, NavigationState>(
+          builder: (context, state) {
+            return IndexedStack(
+              index: state.currentIndex,
+              children: _pages,
+            );
+          },
+        ),
       ),
       bottomNavigationBar: const CustomBottomNavBar(),
     );
