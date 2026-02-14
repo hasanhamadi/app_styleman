@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:app_styleman/products/product_model.dart';
+import 'package:app_styleman/Card/cart_bloc.dart';
+
+import 'package:app_styleman/uesr/auth_bloc.dart';
+import 'package:app_styleman/BottomNavBar/navigation_cubit.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final ProductModel product;
@@ -13,6 +18,45 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   String? selectedSize;
   int activeIndex = 0;
 
+  // تابع مدیریت افزودن به سبد خرید با دیباگ کامل
+  void _handleAddToCart() {
+    print("🔘 [UI] دکمه افزودن کلیک شد");
+
+    final authState = context.read<AuthBloc>().state;
+
+    if (authState is AuthAuthenticated) {
+      print("👤 [UI] کاربر لاگین است: ${authState.user.id}");
+
+      // ارسال ایونت به بلاک
+      context.read<CartBloc>().add(
+        CartItemAdded(product: widget.product),
+      );
+
+      // نمایش پیام موفقیت
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${widget.product.name} به سبد خرید اضافه شد'),
+          backgroundColor: Colors.black87,
+          behavior: SnackBarBehavior.floating,
+          action: SnackBarAction(
+            label: 'مشاهده سبد',
+            textColor: Colors.white,
+            onPressed: () {
+              context.read<NavigationCubit>().updateIndex(2);
+              Navigator.pop(context);
+            },
+          ),
+        ),
+      );
+    } else {
+      print("⚠️ [UI] کاربر لاگین نیست");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("لطفاً ابتدا وارد حساب کاربری خود شوید")),
+      );
+      Navigator.pushNamed(context, '/auth');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -21,48 +65,42 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: CircleAvatar(
-          backgroundColor: Colors.white.withOpacity(0.8),
-          child: const BackButton(color: Colors.black),
+        leading: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: CircleAvatar(
+            backgroundColor: Colors.white.withOpacity(0.9),
+            child: const BackButton(color: Colors.black),
+          ),
         ),
       ),
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // بخش گالری تصاویر
             _buildImageSlider(),
-
             Padding(
               padding: const EdgeInsets.all(20.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // نام و قیمت
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Expanded(
                         child: Text(
                           widget.product.name,
-                          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: -0.5),
+                          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                         ),
                       ),
                       Text(
                         "${widget.product.price} تومان",
-                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.black),
+                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    widget.product.fit, // مثل "Slim Fit" یا "Oversize"
-                    style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
-                  ),
-
+                  Text(widget.product.fit, style: TextStyle(color: Colors.grey.shade600, fontSize: 16)),
                   const Divider(height: 40, thickness: 1),
-
-                  // جزئیات متریال
                   _buildSectionTitle("مشخصات فنی"),
                   const SizedBox(height: 12),
                   Row(
@@ -72,24 +110,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       _buildInfoBadge(Icons.straighten, widget.product.sizeGuide),
                     ],
                   ),
-
                   const SizedBox(height: 30),
-
-                  // انتخاب سایز
                   _buildSectionTitle("انتخاب سایز"),
                   const SizedBox(height: 15),
                   _buildSizeSelector(),
-
                   const SizedBox(height: 30),
-
-                  // توضیحات
                   _buildSectionTitle("توضیحات محصول"),
                   const SizedBox(height: 10),
                   Text(
                     widget.product.description,
                     style: TextStyle(color: Colors.grey.shade700, height: 1.6, fontSize: 15),
                   ),
-                  const SizedBox(height: 100), // فاصله برای دکمه پایین
+                  const SizedBox(height: 120),
                 ],
               ),
             ),
@@ -100,7 +132,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  // اسلایدر تصاویر با اندیکاتور
   Widget _buildImageSlider() {
     final allImages = [widget.product.mainImageUrl, ...widget.product.galleryUrls];
     return Stack(
@@ -111,10 +142,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             onPageChanged: (index) => setState(() => activeIndex = index),
             itemCount: allImages.length,
             itemBuilder: (context, index) {
-              return Image.network(
-                allImages[index],
-                fit: BoxFit.cover,
-              );
+              return Image.network(allImages[index], fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const Icon(Icons.broken_image));
             },
           ),
         ),
@@ -143,19 +172,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   Widget _buildSectionTitle(String title) {
-    return Text(
-      title,
-      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-    );
+    return Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold));
   }
 
   Widget _buildInfoBadge(IconData icon, String label) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(12),
-      ),
+      decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(12)),
       child: Row(
         children: [
           Icon(icon, size: 18, color: Colors.black54),
@@ -183,10 +206,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             ),
             child: Text(
               size,
-              style: TextStyle(
-                color: isSelected ? Colors.white : Colors.black,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(color: isSelected ? Colors.white : Colors.black, fontWeight: FontWeight.bold),
             ),
           ),
         );
@@ -204,7 +224,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       child: SafeArea(
         child: Row(
           children: [
-            // دکمه لایک یا علاقه مندی
             Container(
               decoration: BoxDecoration(
                 border: Border.all(color: Colors.grey.shade300),
@@ -216,23 +235,32 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               ),
             ),
             const SizedBox(width: 15),
-            // دکمه اصلی
             Expanded(
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.black,
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size(double.infinity, 55),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                  elevation: 0,
-                ),
-                onPressed: selectedSize == null ? null : () {
-                  // عملیات خرید
+              child: BlocBuilder<CartBloc, CartState>(
+                builder: (context, state) {
+                  // بررسی وضعیت لودینگ برای دکمه
+                  bool isLoading = state is CartLoading;
+
+                  return ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.black,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size(double.infinity, 55),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                    ),
+                    onPressed: (selectedSize == null || isLoading) ? null : _handleAddToCart,
+                    child: isLoading
+                        ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                    )
+                        : Text(
+                      selectedSize == null ? "سایز را انتخاب کنید" : "افزودن به سبد خرید",
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                  );
                 },
-                child: Text(
-                  selectedSize == null ? "سایز را انتخاب کنید" : "افزودن به سبد خرید",
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
               ),
             ),
           ],

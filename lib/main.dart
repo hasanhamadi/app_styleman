@@ -8,6 +8,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+// ایمپورت‌های سبد خرید
+import 'package:app_styleman/Card/cart_bloc.dart';
+import 'package:app_styleman/Card/cart_repository.dart';
+import 'package:app_styleman/Card/cart_remote_service.dart';
+
 // ایمپورت صفحات
 import 'BottomNavBar/main_wrapper.dart';
 import 'BottomNavBar/navigation_cubit.dart';
@@ -23,16 +28,19 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // ۱. ایجاد نمونه‌های ریپازیتوری
     final apiService = ApiService();
     final productRepository = ProductRepository(apiService);
     final authRepository = AuthRepository();
 
+    // مقداردهی سرویس و ریپازیتوری سبد خرید
+    final cartService = CartRemoteService(apiService.dio);
+    final cartRepository = CartRepositoryImpl(cartService);
+
     return MultiRepositoryProvider(
-      // ۲. تزریق ریپازیتوری‌ها (برای حل خطای ProviderNotFound در صفحه جستجو)
       providers: [
         RepositoryProvider<ProductRepository>.value(value: productRepository),
         RepositoryProvider<AuthRepository>.value(value: authRepository),
+        RepositoryProvider<CartRepository>.value(value: cartRepository),
       ],
       child: MultiBlocProvider(
         providers: [
@@ -44,6 +52,21 @@ class MyApp extends StatelessWidget {
           ),
           BlocProvider<AuthBloc>(
             create: (context) => AuthBloc(authRepository),
+          ),
+          // بروزرسانی CartBloc برای دریافت آیدی واقعی
+          BlocProvider<CartBloc>(
+            create: (context) {
+              final authState = context.read<AuthBloc>().state;
+              String currentUserId = "";
+
+              // اگر کاربر از قبل لاگین است، آیدی او را می‌گیریم
+              if (authState is AuthAuthenticated) {
+                currentUserId = authState.user.id;
+              }
+
+              // ایجاد بلوک با آیدی واقعی (اگر خالی باشد، در لاگین‌های بعدی پر می‌شود)
+              return CartBloc(cartRepository, currentUserId);
+            },
           ),
         ],
         child: MaterialApp(

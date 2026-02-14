@@ -1,0 +1,33 @@
+class _CartSummary extends StatelessWidget {
+  final double totalPrice;
+  const _CartSummary({required this.totalPrice});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, -5))],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text("مبلغ قابل پرداخت:"),
+              Text("$totalPrice تومان", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green)),
+            ],
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.black, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15)),
+            onPressed: () { /* نهایی کردن خرید */ },
+            child: const Text("تکمیل سفارش"),
+          )
+        ],
+      ),
+    );
+  }
+}
