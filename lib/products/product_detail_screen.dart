@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:app_styleman/products/product_model.dart';
 import 'package:app_styleman/Card/cart_bloc.dart';
-
 import 'package:app_styleman/uesr/auth_bloc.dart';
 import 'package:app_styleman/BottomNavBar/navigation_cubit.dart';
 
@@ -18,21 +17,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   String? selectedSize;
   int activeIndex = 0;
 
-  // تابع مدیریت افزودن به سبد خرید با دیباگ کامل
   void _handleAddToCart() {
-    print("🔘 [UI] دکمه افزودن کلیک شد");
-
     final authState = context.read<AuthBloc>().state;
 
     if (authState is AuthAuthenticated) {
-      print("👤 [UI] کاربر لاگین است: ${authState.user.id}");
-
-      // ارسال ایونت به بلاک
+      // ارسال محصول به سبد خرید
       context.read<CartBloc>().add(
         CartItemAdded(product: widget.product),
       );
 
-      // نمایش پیام موفقیت
+      // نمایش Snack Bar موفقیت‌آمیز
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('${widget.product.name} به سبد خرید اضافه شد'),
@@ -40,16 +34,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           behavior: SnackBarBehavior.floating,
           action: SnackBarAction(
             label: 'مشاهده سبد',
-            textColor: Colors.white,
+            textColor: Colors.amber,
             onPressed: () {
-              context.read<NavigationCubit>().updateIndex(2);
-              Navigator.pop(context);
+              context.read<NavigationCubit>().updateIndex(2); // تغییر به تب سبد خرید
+              Navigator.pop(context); // بستن صفحه جزئیات
             },
           ),
         ),
       );
     } else {
-      print("⚠️ [UI] کاربر لاگین نیست");
+      // هدایت به صفحه لاگین اگر کاربر احراز هویت نشده بود
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("لطفاً ابتدا وارد حساب کاربری خود شوید")),
       );
@@ -236,15 +230,22 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             ),
             const SizedBox(width: 15),
             Expanded(
-              child: BlocBuilder<CartBloc, CartState>(
+              child: BlocConsumer<CartBloc, CartState>(
+                listener: (context, state) {
+                  if (state is CartError) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(state.message), backgroundColor: Colors.red),
+                    );
+                  }
+                },
                 builder: (context, state) {
-                  // بررسی وضعیت لودینگ برای دکمه
-                  bool isLoading = state is CartLoading;
+                  final bool isLoading = state is CartLoading;
 
                   return ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.black,
                       foregroundColor: Colors.white,
+                      disabledBackgroundColor: Colors.grey.shade300,
                       minimumSize: const Size(double.infinity, 55),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                     ),
@@ -256,7 +257,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                     )
                         : Text(
-                      selectedSize == null ? "سایز را انتخاب کنید" : "افزودن به سبد خرید",
+                      selectedSize == null ? "ابتدا سایز را انتخاب کنید" : "افزودن به سبد خرید",
                       style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                     ),
                   );

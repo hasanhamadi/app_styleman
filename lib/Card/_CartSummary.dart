@@ -1,3 +1,6 @@
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+
 class _CartSummary extends StatelessWidget {
   final double totalPrice;
   const _CartSummary({required this.totalPrice});

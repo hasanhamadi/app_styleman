@@ -9,35 +9,42 @@ part 'cart_state.dart';
 
 class CartBloc extends Bloc<CartEvent, CartState> {
   final CartRepository _cartRepository;
-  String? _currentUserId; // ذخیره آیدی کاربر در حافظه بلاک
+  String? _currentUserId;
 
-  CartBloc(this._cartRepository, [this._currentUserId]) : super(CartInitial()) {
+  CartBloc(this._cartRepository) : super(CartInitial()) {
 
-    // مدیریت رویداد شروع با آیدی کاربر
     on<CartStarted>((event, emit) async {
-      _currentUserId = event.userId; // بروزرسانی آیدی
+      _currentUserId = event.userId;
+      if (_currentUserId == null || _currentUserId!.isEmpty) return;
+
       emit(CartLoading());
       try {
-        final items = await _cartRepository.fetchCart(event.userId);
+        final items = await _cartRepository.fetchCart(_currentUserId!);
         emit(CartLoaded(items: items));
       } catch (e) {
-        emit(CartError(e.toString()));
+        emit(CartError("خطا در دریافت سبد خرید: ${e.toString()}"));
       }
     });
 
     on<CartItemAdded>((event, emit) async {
-      if (_currentUserId == null) return;
+      // اگر آیدی نبود، عملیات را متوقف کن
+      if (_currentUserId == null || _currentUserId!.isEmpty) {
+        emit(CartError("ابتدا وارد حساب کاربری شوید"));
+        return;
+      }
 
       try {
-        // ابتدا عملیات افزودن در ریپازیتوری
+        // ۱. افزودن به دیتابیس
         await _cartRepository.addToCart(_currentUserId!, event.product.id, 1);
-        // سپس بارگذاری مجدد لیست برای بروزرسانی UI
-        add(CartStarted(userId: _currentUserId!));
+
+        // ۲. دریافت مجدد لیست برای بروزرسانی UI بدون حالت Loading (تجربه کاربری بهتر)
+        final items = await _cartRepository.fetchCart(_currentUserId!);
+        emit(CartLoaded(items: items));
       } catch (e) {
         emit(CartError("افزودن به سبد با خطا مواجه شد"));
       }
     });
 
-    // سایر هندلرها (حذف و آپدیت) مشابه بالا پیاده می‌شوند
+    // اینجا می‌توانید ایونت‌های Update و Delete را هم اضافه کنید
   }
 }
