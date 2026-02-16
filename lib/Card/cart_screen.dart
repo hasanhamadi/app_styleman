@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'cart_bloc.dart';
 import 'cart_item_tile.dart';
+// ایمپورت‌های مورد نیاز برای بخش سفارش
+import '../Order/iorder_repository.dart';
+import '../Order/order_model.dart';
+import '../Order/order_bloc.dart';
+import '../uesr/auth_bloc.dart';
 
 class CartScreen extends StatelessWidget {
   const CartScreen({super.key});
@@ -39,8 +44,11 @@ class CartScreen extends StatelessWidget {
                     },
                   ),
                 ),
-                // فراخوانی ویجت خلاصه قیمت
-                _CartSummary(totalPrice: state.totalPrice),
+                // پاس دادن قیمت کل و لیست آیتم‌ها به ویجت خلاصه
+                _CartSummary(
+                  totalPrice: state.totalPrice,
+                  cartItems: state.items, // بسیار مهم برای ثبت سفارش
+                ),
               ],
             );
           }
@@ -56,11 +64,11 @@ class CartScreen extends StatelessWidget {
   }
 }
 
-// --- ویجت خلاصه قیمت که خطا می‌داد ---
 class _CartSummary extends StatelessWidget {
   final double totalPrice;
+  final List cartItems; // اضافه شدن لیست آیتم‌ها
 
-  const _CartSummary({required this.totalPrice});
+  const _CartSummary({required this.totalPrice, required this.cartItems});
 
   @override
   Widget build(BuildContext context) {
@@ -78,47 +86,117 @@ class _CartSummary extends StatelessWidget {
       ),
       child: SafeArea(
         child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
-                  "جمع کل:",
-                  style: TextStyle(color: Colors.grey, fontSize: 14),
-                ),
-                Text(
-                  "$totalPrice تومان",
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
-                  ),
-                ),
+                const Text("مبلغ قابل پرداخت:", style: TextStyle(color: Colors.grey, fontSize: 13)),
+                Text("${totalPrice.toInt()} تومان",
+                    style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold, color: Colors.green)),
               ],
             ),
-            const SizedBox(width: 20),
-            Expanded(
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.black,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () => _showConfirmDialog(context),
+              child: const Text("تکمیل سفارش", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showConfirmDialog(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (builderContext) => Container(
+        padding: const EdgeInsets.all(25),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text("تایید نهایی خرید", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 15),
+            Text("مبلغ ${totalPrice.toInt()} تومان به لیست سفارشات شما اضافه خواهد شد."),
+            const SizedBox(height: 25),
+            SizedBox(
+              width: double.infinity,
               child: ElevatedButton(
-                onPressed: () {
-                  // عملیات تسویه حساب
-                },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.black,
-                  padding: const EdgeInsets.symmetric(vertical: 15),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text(
-                  "تکمیل سفارش",
-                  style: TextStyle(color: Colors.white, fontSize: 16),
-                ),
+                    backgroundColor: Colors.black,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 15)),
+                onPressed: () {
+                  Navigator.pop(builderContext);
+                  _processOrder(context); // اجرای لاجیک ثبت
+                },
+                child: const Text("ثبت و پرداخت نهایی"),
               ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _processOrder(BuildContext context) async {
+    showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(child: CircularProgressIndicator(color: Colors.black)));
+
+    try {
+      final authState = context.read<AuthBloc>().state;
+      String userId = "";
+      if (authState is AuthAuthenticated) {
+        userId = authState.user.id;
+      }
+
+      if (userId.isEmpty) throw Exception("لطفاً وارد حساب کاربری شوید");
+
+      // ساخت مدل سفارش از آیتم‌های واقعی سبد خرید
+      final order = OrderModel(
+        id: '',
+        userId: userId,
+        totalPrice: totalPrice,
+        status: 'pending',
+        created: DateTime.now(),
+        items: cartItems.map((item) => OrderItem(
+          name: item.product.name,
+          price: item.product.price.toDouble(),
+          qty: item.quantity,
+        )).toList(),
+      );
+
+      // ثبت در دیتابیس
+      await context.read<IOrderRepository>().saveNewOrder(order);
+
+      if (context.mounted) {
+        Navigator.pop(context); // بستن لودینگ
+
+        // رفرش کردن لیست سفارشات در بلاک
+        context.read<OrderBloc>().add(LoadOrdersEvent());
+
+        // انتقال به صفحه سفارشات
+        Navigator.pushReplacementNamed(context, '/orders');
+
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("سفارش با موفقیت ثبت شد ✅"), backgroundColor: Colors.green)
+        );
+      }
+    } catch (e) {
+      if (context.mounted) Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("خطا: ${e.toString()}"), backgroundColor: Colors.red)
+      );
+    }
   }
 }

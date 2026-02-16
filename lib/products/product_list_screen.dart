@@ -1,7 +1,10 @@
 import 'package:app_styleman/products/product_bloc.dart';
 import 'package:app_styleman/products/product_detail_screen.dart';
+// این خط را برای دسترسی به صفحه سفارشات اضافه کنید
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+
+import '../Order/order_list_page.dart';
 
 
 class ProductListScreen extends StatelessWidget {
@@ -13,6 +16,19 @@ class ProductListScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text("محصولات جدید"),
         centerTitle: true,
+        // --- بخش اضافه شده برای تست سفارشات ---
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.receipt_long_rounded), // آیکون سفارشات
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const OrderListPage()),
+              );
+            },
+          ),
+        ],
+        // --------------------------------------
       ),
       body: BlocBuilder<ProductBloc, ProductState>(
         builder: (context, state) {
@@ -46,7 +62,7 @@ class ProductListScreen extends StatelessWidget {
   }
 }
 
-// ویجت کارت محصول
+// ویجت کارت محصول (بدون تغییر)
 class _ProductCard extends StatelessWidget {
   final product;
   const _ProductCard({required this.product});
