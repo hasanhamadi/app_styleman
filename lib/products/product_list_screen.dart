@@ -2,11 +2,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:app_styleman/products/product_bloc.dart';
+import 'package:app_styleman/products/product_model.dart';
 import 'package:app_styleman/products/product_detail_screen.dart';
+import 'package:app_styleman/banner/banner_bloc.dart';
 import '../Order/order_list_page.dart';
-
-// نکته: فرض شده BannerBloc را برای دریافت بنرها از API پیاده‌سازی کرده‌اید
-// import 'package:app_styleman/banner/banner_bloc.dart';
 
 class ProductListScreen extends StatefulWidget {
   const ProductListScreen({super.key});
@@ -16,19 +15,26 @@ class ProductListScreen extends StatefulWidget {
 }
 
 class _ProductListScreenState extends State<ProductListScreen> {
-  final PageController _bannerController = PageController(viewportFraction: 0.9);
-  int _currentBannerPage = 0;
+  // تنظیمات اسلایدر بی‌نهایت
+  static const int _initialPage = 1000;
+  late PageController _bannerController;
+  int _currentVirtualPage = _initialPage;
   Timer? _timer;
+  int _bannerCount = 0;
 
   @override
   void initState() {
     super.initState();
-    // تایمر اسلایدر خودکار برای بنرها
+    _bannerController = PageController(viewportFraction: 0.9, initialPage: _initialPage);
+
+    // فراخوانی رویدادهای بارگذاری
+    context.read<BannerBloc>().add(BannerLoadStarted());
+    context.read<ProductBloc>().add(RefreshProductsEvent());
+
+    // مدیریت اسکرول خودکار
     _timer = Timer.periodic(const Duration(seconds: 5), (timer) {
-      if (_bannerController.hasClients) {
-        _currentBannerPage = (_currentBannerPage + 1) % 3; // تعداد بنرهای فرضی
-        _bannerController.animateToPage(
-          _currentBannerPage,
+      if (_bannerController.hasClients && _bannerCount > 0) {
+        _bannerController.nextPage(
           duration: const Duration(milliseconds: 800),
           curve: Curves.easeInOutCubic,
         );
@@ -51,21 +57,19 @@ class _ProductListScreenState extends State<ProductListScreen> {
         child: RefreshIndicator(
           onRefresh: () async {
             context.read<ProductBloc>().add(RefreshProductsEvent());
-            // context.read<BannerBloc>().add(BannerLoadStarted()); // اگر بنر دارید
+            context.read<BannerBloc>().add(BannerRefreshRequested());
           },
           child: CustomScrollView(
             physics: const BouncingScrollPhysics(),
             slivers: [
-              // --- ۱. AppBar حرفه‌ای و مینیمال ---
               _buildAppBar(context),
 
-              // --- ۲. اسلایدر بنر مدرن ---
+              // اسلایدر بنر
               SliverToBoxAdapter(child: _buildBannerSection()),
 
-              // --- ۳. عنوان بخش محصولات جدید ---
-              SliverToBoxAdapter(child: _buildSectionTitle("جدیدترین محصولات")),
+              _buildSectionTitle("جدیدترین محصولات"),
 
-              // --- ۴. گرید محصولات با BlocBuilder ---
+              // گرید محصولات
               _buildProductGrid(),
 
               const SliverToBoxAdapter(child: SizedBox(height: 20)),
@@ -84,7 +88,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
       centerTitle: true,
       leading: IconButton(
         icon: const Icon(Icons.notifications_none_rounded, color: Colors.black87),
-        onPressed: () {}, // بخش اعلانات
+        onPressed: () {},
       ),
       title: const Text(
         "Setayesh",
@@ -108,69 +112,90 @@ class _ProductListScreenState extends State<ProductListScreen> {
   }
 
   Widget _buildBannerSection() {
-    return Column(
-      children: [
-        const SizedBox(height: 15),
-        SizedBox(
-          height: 180,
-          child: PageView.builder(
-            controller: _bannerController,
-            onPageChanged: (index) => setState(() => _currentBannerPage = index),
-            itemCount: 3,
-            itemBuilder: (context, index) {
-              return Container(
-                margin: const EdgeInsets.symmetric(horizontal: 8),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
-                  image: const DecorationImage(
-                    image: NetworkImage("https://picsum.photos/800/400"), // آدرس از مدل بنر
-                    fit: BoxFit.cover,
-                  ),
+    return BlocConsumer<BannerBloc, BannerState>(
+      listener: (context, state) {
+        if (state is BannerLoadSuccess) {
+          setState(() {
+            _bannerCount = state.imageUrls.length;
+          });
+        }
+      },
+      builder: (context, state) {
+        if (state is BannerLoadInProgress) {
+          return const SizedBox(
+            height: 180,
+            child: Center(child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2)),
+          );
+        } else if (state is BannerLoadSuccess && state.imageUrls.isNotEmpty) {
+          final images = state.imageUrls;
+          return Column(
+            children: [
+              const SizedBox(height: 15),
+              SizedBox(
+                height: 180,
+                child: PageView.builder(
+                  controller: _bannerController,
+                  onPageChanged: (index) => setState(() => _currentVirtualPage = index),
+                  itemBuilder: (context, index) {
+                    final actualIndex = index % images.length;
+                    return Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 8),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(20),
+                        color: Colors.grey.shade200,
+                        image: DecorationImage(
+                          image: NetworkImage(images[actualIndex]),
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(20),
+                          gradient: LinearGradient(
+                            begin: Alignment.bottomCenter,
+                            end: Alignment.topCenter,
+                            colors: [Colors.black.withOpacity(0.4), Colors.transparent],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
-                child: Container(
+              ),
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(images.length, (index) => AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  height: 6,
+                  width: (_currentVirtualPage % images.length) == index ? 18 : 6,
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
-                    gradient: LinearGradient(
-                      begin: Alignment.bottomCenter,
-                      colors: [Colors.black.withOpacity(0.5), Colors.transparent],
-                    ),
+                    color: (_currentVirtualPage % images.length) == index ? Colors.black : Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                ),
-              );
-            },
-          ),
-        ),
-        const SizedBox(height: 10),
-        // Dots Indicator
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(3, (index) => AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            margin: const EdgeInsets.symmetric(horizontal: 4),
-            height: 6,
-            width: _currentBannerPage == index ? 18 : 6,
-            decoration: BoxDecoration(
-              color: _currentBannerPage == index ? Colors.black : Colors.grey.shade300,
-              borderRadius: BorderRadius.circular(10),
-            ),
-          )),
-        ),
-      ],
+                )),
+              ),
+            ],
+          );
+        }
+        return const SizedBox.shrink();
+      },
     );
   }
 
   Widget _buildSectionTitle(String title) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 30, 16, 15),
-      child: Column(
-        children: [
-          Text(
-            title,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 4),
-          Container(width: 35, height: 3, decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(10))),
-        ],
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 30, 16, 15),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
+            Container(width: 35, height: 3, decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(10))),
+          ],
+        ),
       ),
     );
   }
@@ -193,7 +218,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
                 mainAxisSpacing: 15,
               ),
               delegate: SliverChildBuilderDelegate(
-                    (context, index) => _ProductCard(product: state.products[index]),
+                    (context, index) => _ProductCard(product: state.products[index] as ProductModel),
                 childCount: state.products.length,
               ),
             ),
@@ -206,7 +231,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
 }
 
 class _ProductCard extends StatelessWidget {
-  final dynamic product;
+  final ProductModel product;
   const _ProductCard({required this.product});
 
   @override
@@ -220,9 +245,7 @@ class _ProductCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 5)),
-          ],
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 5))],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -236,14 +259,14 @@ class _ProductCard extends StatelessWidget {
                       product.mainImageUrl,
                       fit: BoxFit.cover,
                       width: double.infinity,
-                      errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image),
+                      errorBuilder: (context, error, stackTrace) => const Center(child: Icon(Icons.broken_image, size: 40)),
                     ),
                   ),
                   Positioned(
                     top: 10,
                     right: 10,
                     child: CircleAvatar(
-                      backgroundColor: Colors.white.withAlpha(200),
+                      backgroundColor: Colors.white.withOpacity(0.8),
                       radius: 15,
                       child: const Icon(Icons.favorite_border_rounded, size: 16, color: Colors.black87),
                     ),

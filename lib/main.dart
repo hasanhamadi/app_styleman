@@ -2,13 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-// ایمپورت‌های سرویس و ریپازیتوری
+// --- ایمپورت‌های جدید بنر ---
+import 'package:app_styleman/banner/banner_service.dart';
+import 'package:app_styleman/banner/banner_repository.dart';
+import 'package:app_styleman/banner/banner_bloc.dart';
+
+// ایمپورت‌های سرویس و ریپازیتوری قبلی
 import 'package:app_styleman/products/api_service.dart';
 import 'package:app_styleman/products/product_repository.dart';
 import 'package:app_styleman/uesr/auth_repository.dart';
 import 'package:app_styleman/Card/cart_repository.dart';
 import 'package:app_styleman/Card/cart_remote_service.dart';
-// --- اضافه‌شده برای سفارشات ---
 import 'package:app_styleman/Order/order_service.dart';
 import 'package:app_styleman/Order/iorder_repository.dart';
 
@@ -17,7 +21,6 @@ import 'package:app_styleman/products/product_bloc.dart';
 import 'package:app_styleman/uesr/auth_bloc.dart';
 import 'package:app_styleman/Card/cart_bloc.dart';
 import 'package:app_styleman/BottomNavBar/navigation_cubit.dart';
-// --- اضافه‌شده برای سفارشات ---
 import 'package:app_styleman/Order/order_bloc.dart';
 
 // ایمپورت صفحات (UI)
@@ -25,7 +28,7 @@ import 'package:app_styleman/uesr/auth_page.dart';
 import 'package:app_styleman/BottomNavBar/main_wrapper.dart';
 import 'package:app_styleman/Splash Screen/onboarding_screen.dart';
 import 'package:app_styleman/Splash Screen/splash_screen.dart';
-import 'package:app_styleman/Order/order_list_page.dart'; // صفحه لیست سفارشات برای مسیردهی
+import 'package:app_styleman/Order/order_list_page.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -38,26 +41,34 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // ۱. مقداردهی اولیه‌ی سرویس‌ها و ریپازیتوری‌ها
-    final apiService = ApiService();
+    final apiService = ApiService(); // حاوی Dio برای استفاده مشترک
+
+    // سرویس و ریپازیتوری بنر
+    final bannerService = BannerService(apiService.dio);
+    final bannerRepository = BannerRepository(bannerService);
+
     final productRepository = ProductRepository(apiService);
     final authRepository = AuthRepository();
     final cartService = CartRemoteService(apiService.dio);
     final cartRepository = CartRepositoryImpl(cartService);
-
-    // --- اضافه‌شده برای سفارشات ---
-    final orderService = OrderService(); // سرویسی که قبلاً بروزرسانی کردیم
+    final orderService = OrderService();
     final orderRepository = OrderRepository(orderService);
 
     return MultiRepositoryProvider(
       providers: [
+        // تزریق ریپازیتوری بنر (حل مشکل لایه داده)
+        RepositoryProvider<BannerRepository>.value(value: bannerRepository),
         RepositoryProvider<ProductRepository>.value(value: productRepository),
         RepositoryProvider<AuthRepository>.value(value: authRepository),
         RepositoryProvider<CartRepository>.value(value: cartRepository),
-        // --- تزریق ریپازیتوری سفارشات ---
         RepositoryProvider<IOrderRepository>.value(value: orderRepository),
       ],
       child: MultiBlocProvider(
         providers: [
+          // تزریق بلاک بنر (حل قطعی خطای قرمز تصویر شما)
+          BlocProvider<BannerBloc>(
+            create: (context) => BannerBloc(bannerRepository),
+          ),
           BlocProvider<AuthBloc>(
             create: (context) => AuthBloc(authRepository),
           ),
@@ -70,27 +81,20 @@ class MyApp extends StatelessWidget {
           BlocProvider<CartBloc>(
             create: (context) => CartBloc(cartRepository),
           ),
-          // --- تزریق بلاک سفارشات ---
           BlocProvider<OrderBloc>(
             create: (context) => OrderBloc(orderRepository),
           ),
         ],
-        // ۲. استفاده از BlocListener برای هماهنگی Auth و Cart
         child: BlocListener<AuthBloc, AuthState>(
           listener: (context, state) {
             if (state is AuthAuthenticated) {
-              print("🟢 [Main] User Authenticated: ${state.user.id}. Starting Cart...");
               context.read<CartBloc>().add(CartStarted(userId: state.user.id));
-
-              // --- اضافه شده: بارگذاری سفارشات کاربر بلافاصله بعد از لاگین ---
               context.read<OrderBloc>().add(LoadOrdersEvent());
             }
           },
           child: MaterialApp(
-            title: 'Styleman App',
+            title: 'Setayesh Styleman',
             debugShowCheckedModeBanner: false,
-
-            // ۳. تنظیمات زبان و فونت فارسی
             theme: ThemeData(
               fontFamily: 'Vazir',
               useMaterial3: true,
@@ -103,15 +107,12 @@ class MyApp extends StatelessWidget {
             ],
             supportedLocales: const [Locale('fa', 'IR')],
             locale: const Locale('fa', 'IR'),
-
-            // ۴. مسیرها (Routes)
             initialRoute: '/',
             routes: {
               '/': (context) => const SplashScreen(),
               '/onboarding': (context) => const OnboardingScreen(),
               '/auth': (context) => AuthPage(),
               '/home': (context) => const MainWrapper(),
-              // --- مسیر صفحه سفارشات ---
               '/orders': (context) => const OrderListPage(),
             },
           ),
