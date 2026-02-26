@@ -13,8 +13,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   String? selectedSize;
   String? selectedColor;
   int activeIndex = 0;
+  final PageController _pageController = PageController();
 
-  // تابع تبدیل نام فارسی به رنگ
   Color _getColorFromText(String colorName) {
     if (colorName.contains("مشکی")) return Colors.black;
     if (colorName.contains("سفید")) return Colors.white;
@@ -27,7 +27,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return Colors.grey.shade300;
   }
 
-  // بررسی موجودی سایز
   bool _isSizeAvailable(String size) {
     String stockValue = "";
     switch (size.toUpperCase()) {
@@ -37,105 +36,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       case 'XL': stockValue = widget.product.xl; break;
       default: return true;
     }
-    if (stockValue.isEmpty) return true;
     int? stock = int.tryParse(stockValue);
-    return (stock == null) ? true : stock > 0;
-  }
-
-  // نمایش راهنمای اندازه (BottomSheet)
-  void _showSizeGuide() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.75,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
-        ),
-        child: Column(
-          children: [
-            const SizedBox(height: 12),
-            Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10))),
-
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text("راهنمای اندازه (سانتی‌متر)", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
-                ],
-              ),
-            ),
-
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Column(
-                  children: [
-                    // تصویر راهنمای اندازه‌گیری
-                    Container(
-                      padding: const EdgeInsets.all(15),
-                      decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(15)),
-                      child: Image.network(
-                        "https://img.freepik.com/free-vector/t-shirt-design-template_1035-10145.jpg",
-                        height: 180,
-                      ),
-                    ),
-                    const SizedBox(height: 25),
-
-                    // جدول با داده‌های زنده از ProductModel
-                    Table(
-                      border: TableBorder.all(color: Colors.grey.shade200, width: 1, borderRadius: BorderRadius.circular(8)),
-                      children: [
-                        _buildTableRow(["سایز", "مقدار اندازه (cm)"], isHeader: true),
-                        _buildTableRow(["S", widget.product.s]),
-                        _buildTableRow(["M", widget.product.m]),
-                        _buildTableRow(["L", widget.product.l]),
-                        _buildTableRow(["XL", widget.product.xl]),
-                      ],
-                    ),
-                    const SizedBox(height: 15),
-                    const Text(
-                      "* مقادیر بالا بر اساس سانتیمتر و مربوط به ابعاد اصلی کالا می‌باشد.",
-                      style: TextStyle(color: Colors.black38, fontSize: 12),
-                    )
-                  ],
-                ),
-              ),
-            ),
-
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.grey[100],
-                  foregroundColor: Colors.black,
-                  minimumSize: const Size(double.infinity, 55),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                ),
-                onPressed: () => Navigator.pop(context),
-                child: const Text("متوجه شدم", style: TextStyle(fontWeight: FontWeight.bold)),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  TableRow _buildTableRow(List<String> cells, {bool isHeader = false}) {
-    return TableRow(
-      decoration: BoxDecoration(color: isHeader ? Colors.grey[50] : Colors.white),
-      children: cells.map((cell) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Text(cell, textAlign: TextAlign.center, style: TextStyle(
-          fontWeight: isHeader ? FontWeight.bold : FontWeight.normal,
-        )),
-      )).toList(),
-    );
+    return (stock == null) ? false : stock > 0;
   }
 
   @override
@@ -148,13 +50,22 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         backgroundColor: Colors.white,
         body: Stack(
           children: [
+            // محتوای اصلی اسکرول شونده
             CustomScrollView(
               physics: const BouncingScrollPhysics(),
               slivers: [
-                _buildSliverAppBar(allImages),
+                // بخش تصویر محصول (جایگزین SliverAppBar)
+                _buildProductImageHeader(allImages),
+
+                // گالری تصاویر کوچک
+                SliverToBoxAdapter(
+                  child: _buildThumbnailsGallery(allImages),
+                ),
+
+                // جزئیات محصول
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 30, 20, 140),
+                    padding: const EdgeInsets.fromLTRB(20, 10, 20, 140),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -167,30 +78,26 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         _buildDynamicSectionTitle("سایز:", selectedSize),
                         const SizedBox(height: 15),
                         _buildSizeSelector(),
-                        const SizedBox(height: 10),
-                        // دکمه راهنمای اندازه آبی رنگ
-                        GestureDetector(
-                          onTap: _showSizeGuide,
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text("راهنمای اندازه", style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
-                              Icon(Icons.chevron_left, color: Colors.blue, size: 20),
-                            ],
-                          ),
-                        ),
                         const SizedBox(height: 35),
-                        _buildSectionTitle("ویژگی‌های کالا"),
+                        _buildSectionTitle("مشخصات کالا"),
                         _buildSpecCard(),
-                        const SizedBox(height: 30),
+                        const SizedBox(height: 35),
                         _buildSectionTitle("توضیحات"),
-                        Text(widget.product.description, style: const TextStyle(color: Colors.black54, fontSize: 14, height: 1.8)),
+                        Text(
+                          widget.product.description,
+                          style: const TextStyle(color: Colors.black54, fontSize: 14, height: 1.8),
+                        ),
                       ],
                     ),
                   ),
                 ),
               ],
             ),
+
+            // اپ بار ثابت با پس‌زمینه سفید
+            _buildFixedAppBar(),
+
+            // دکمه افزودن به سبد خرید ثابت در پایین
             _buildStickyBottomAction(),
           ],
         ),
@@ -198,13 +105,200 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  Widget _buildDynamicSectionTitle(String title, String? value) {
-    return Row(
-      children: [
-        Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
-        const SizedBox(width: 8),
-        Text(value ?? "انتخاب کنید", style: TextStyle(fontSize: 16, color: value != null ? Colors.black87 : Colors.black26, fontWeight: FontWeight.w600)),
-      ],
+  // ویجت اپ بار ثابت
+  Widget _buildFixedAppBar() {
+    return Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      child: Container(
+        padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top, bottom: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.menu, color: Colors.black, size: 26),
+                onPressed: () {},
+              ),
+              const Spacer(),
+              Image.network(
+                'https://wigo-mod.com/wp-content/uploads/2023/04/wigo-logo-new.png',
+                height: 28,
+                errorBuilder: (context, error, stackTrace) => const Text("WIGO",
+                    style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
+              ),
+              const Spacer(),
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.shopping_bag_outlined, color: Colors.black, size: 26),
+                    onPressed: () {},
+                  ),
+                  Positioned(
+                    top: 10,
+                    right: 8,
+                    child: Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: const BoxDecoration(color: Color(0xFF0091FF), shape: BoxShape.circle),
+                      constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
+                      child: const Text('۰',
+                          style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                          textAlign: TextAlign.center),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // بخش نمایش تصویر اصلی محصول
+  Widget _buildProductImageHeader(List<String> images) {
+    return SliverToBoxAdapter(
+      child: Container(
+        height: MediaQuery.of(context).size.height * 0.65,
+        margin: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 60),
+        padding: const EdgeInsets.all(15.0),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(25),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              PageView.builder(
+                controller: _pageController,
+                onPageChanged: (i) => setState(() => activeIndex = i),
+                itemCount: images.length,
+                itemBuilder: (context, index) => Image.network(images[index], fit: BoxFit.cover),
+              ),
+              Positioned(
+                bottom: 15,
+                left: 15,
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10)]
+                  ),
+                  child: const Icon(Icons.fullscreen, color: Colors.black, size: 20),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // گالری تصاویر کوچک پایین عکس اصلی
+  Widget _buildThumbnailsGallery(List<String> allImages) {
+    return Container(
+      height: 120,
+      padding: const EdgeInsets.symmetric(vertical: 15),
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 15),
+        itemCount: allImages.length,
+        itemBuilder: (context, index) => GestureDetector(
+          onTap: () => _pageController.animateToPage(index,
+              duration: const Duration(milliseconds: 300), curve: Curves.easeInOut),
+          child: Container(
+            width: 85,
+            margin: const EdgeInsets.only(left: 10),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(15),
+              border: Border.all(
+                  color: activeIndex == index ? Colors.black : Colors.transparent,
+                  width: 2),
+              image: DecorationImage(
+                  image: NetworkImage(allImages[index]), fit: BoxFit.cover),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSizeSelector() {
+    return Wrap(
+      spacing: 12, runSpacing: 12,
+      children: widget.product.sizes.map((size) {
+        bool available = _isSizeAvailable(size);
+        bool isSelected = selectedSize == size;
+        return GestureDetector(
+          onTap: available ? () => setState(() => selectedSize = size) : null,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              color: isSelected ? Colors.black : Colors.white,
+              border: Border.all(color: available ? Colors.black12 : Colors.grey.shade200),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (isSelected) const Icon(Icons.check, color: Colors.white, size: 16),
+                if (isSelected) const SizedBox(width: 5),
+                Text(size, style: TextStyle(
+                  color: isSelected ? Colors.white : (available ? Colors.black : Colors.grey.shade300),
+                  fontWeight: FontWeight.bold,
+                )),
+              ],
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildSpecCard() {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF9F9F9),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.black.withOpacity(0.03)),
+      ),
+      child: Column(
+        children: [
+          _buildSpecRow("جنس کالا", widget.product.material),
+          _buildSpecRow("نوع یقه", widget.product.neckline),
+          _buildSpecRow("نوع آستین", widget.product.sleeveType),
+          _buildSpecRow("تن‌خور", widget.product.fit),
+          _buildSpecRow("کد محصول", widget.product.id.substring(0, 8), isLast: true, isCode: true),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSpecRow(String label, String value, {bool isLast = false, bool isCode = false}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      decoration: BoxDecoration(border: Border(bottom: isLast ? BorderSide.none : BorderSide(color: Colors.grey.shade200, width: 0.5))),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          if (isCode) Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+          Text(label, style: const TextStyle(color: Colors.black45, fontSize: 14)),
+          if (!isCode) Text(value.isEmpty ? "نامشخص" : value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+        ],
+      ),
     );
   }
 
@@ -237,55 +331,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  Widget _buildSizeSelector() {
-    return Wrap(
-      spacing: 12, runSpacing: 12,
-      children: widget.product.sizes.map((size) {
-        bool available = _isSizeAvailable(size);
-        bool isSelected = selectedSize == size;
-        return GestureDetector(
-          onTap: available ? () => setState(() => selectedSize = size) : null,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 250),
-            width: 46, height: 46, padding: const EdgeInsets.all(3),
-            decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: isSelected ? Colors.black : Colors.transparent, width: 1.5)),
-            child: Container(
-              decoration: BoxDecoration(shape: BoxShape.circle, color: isSelected ? Colors.black : (available ? Colors.white : Colors.grey.shade50), border: Border.all(color: isSelected ? Colors.black : (available ? Colors.black12 : Colors.grey.shade200))),
-              child: Center(
-                child: Directionality(
-                  textDirection: TextDirection.ltr,
-                  child: Text(size, style: TextStyle(color: isSelected ? Colors.white : (available ? Colors.black87 : Colors.grey.shade300), fontWeight: FontWeight.bold, fontSize: 13, decoration: available ? null : TextDecoration.lineThrough)),
-                ),
-              ),
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  // بقیه متدهای UI (_buildSliverAppBar, _buildTitleSection, _buildSpecCard, _buildStickyBottomAction, ...)
-  Widget _buildSliverAppBar(List<String> images) {
-    return SliverAppBar(
-      expandedHeight: MediaQuery.of(context).size.height * 0.55,
-      backgroundColor: Colors.white,
-      pinned: true,
-      leading: IconButton(icon: const Icon(Icons.arrow_back_ios_new, size: 20), onPressed: () => Navigator.pop(context)),
-      actions: [
-        IconButton(icon: const Icon(Icons.share_outlined, size: 22), onPressed: () {}),
-        IconButton(icon: const Icon(Icons.shopping_bag_outlined, size: 22), onPressed: () {}),
-        const SizedBox(width: 10),
-      ],
-      flexibleSpace: FlexibleSpaceBar(
-        background: PageView.builder(
-          onPageChanged: (i) => setState(() => activeIndex = i),
-          itemCount: images.length,
-          itemBuilder: (context, index) => Image.network(images[index], fit: BoxFit.cover),
-        ),
-      ),
-    );
-  }
-
   Widget _buildTitleSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -293,47 +338,43 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(widget.product.name, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
-            IconButton(icon: const Icon(Icons.favorite_border, size: 28), onPressed: () {}),
+            Expanded(child: Text(widget.product.name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold))),
+            const Icon(Icons.favorite_border, size: 26),
           ],
         ),
-        const Divider(height: 30),
+        const SizedBox(height: 5),
+        const Text("Styleman Exclusive", style: TextStyle(color: Colors.black38, fontSize: 14)),
       ],
     );
   }
 
-  Widget _buildSpecCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(22)),
-      child: Column(
-        children: [
-          _buildRowInfo("جنس کار", widget.product.material),
-          const Divider(height: 30),
-          _buildRowInfo("تن‌خور", widget.product.fit),
-        ],
-      ),
+  Widget _buildDynamicSectionTitle(String title, String? value) {
+    return Row(
+      children: [
+        Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        const SizedBox(width: 8),
+        Text(value ?? "انتخاب کنید", style: TextStyle(fontSize: 15, color: value != null ? Colors.black87 : Colors.black26)),
+      ],
     );
-  }
-
-  Widget _buildRowInfo(String label, String value) {
-    return Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(label, style: const TextStyle(color: Colors.black45)), Text(value, style: const TextStyle(fontWeight: FontWeight.bold))]);
   }
 
   Widget _buildStickyBottomAction() {
     return Align(
       alignment: Alignment.bottomCenter,
       child: Container(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
-        color: Colors.white,
+        padding: const EdgeInsets.fromLTRB(20, 15, 20, 30),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -5))],
+        ),
         child: ElevatedButton(
-          style: ElevatedButton.styleFrom(backgroundColor: Colors.black, minimumSize: const Size(double.infinity, 65), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))),
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.black, minimumSize: const Size(double.infinity, 60), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
           onPressed: () {},
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text("افزودن به سبد خرید", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-              Text("${widget.product.price} تومان", style: const TextStyle(color: Colors.white)),
+              const Text("افزودن به سبد خرید", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+              Text("${widget.product.price} تومان", style: const TextStyle(color: Colors.white, fontSize: 15)),
             ],
           ),
         ),
@@ -342,6 +383,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   Widget _buildSectionTitle(String title) {
-    return Padding(padding: const EdgeInsets.only(bottom: 18), child: Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)));
+    return Padding(padding: const EdgeInsets.only(bottom: 12), child: Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)));
   }
 }
