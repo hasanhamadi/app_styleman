@@ -43,7 +43,7 @@ class ProductModel {
       id: json['id'] ?? '',
       collectionId: json['collectionId'] ?? '',
       name: json['name'] ?? 'بدون نام',
-      description: json['description'] ?? '',
+      description: json['descrption'] ?? '',
       price: (json['price'] ?? 0).toInt(),
       image: json['image'] ?? '',
       images: List<String>.from(json['images'] ?? []),
